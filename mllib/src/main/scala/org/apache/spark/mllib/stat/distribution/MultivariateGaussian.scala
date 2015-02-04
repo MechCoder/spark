@@ -20,7 +20,7 @@ package org.apache.spark.mllib.stat.distribution
 import breeze.linalg.{DenseVector => DBV, DenseMatrix => DBM, diag, max, eigSym}
 
 import org.apache.spark.annotation.DeveloperApi;
-import org.apache.spark.mllib.linalg.{Vectors, Vector, Matrices, Matrix}
+import org.apache.spark.mllib.linalg.{Vectors, Vector, Matrices, Matrix, SparseVector}
 import org.apache.spark.mllib.util.MLUtils
 
 /**
@@ -62,14 +62,24 @@ class MultivariateGaussian (
   
   /** Returns density of this multivariate Gaussian at given point, x */
   def pdf(x: Vector): Double = {
-    pdf(x.toBreeze.toDenseVector)
+
+    // To handle Vectors.sparse
+    val isSparse = x.isInstanceOf[SparseVector]
+    if (isSparse) {
+      math.exp(logpdfSparse(x.asInstanceOf[SparseVector]))
+    }
+    else pdf(x.toBreeze.toDenseVector)
   }
-  
+
   /** Returns the log-density of this multivariate Gaussian at given point, x */
   def logpdf(x: Vector): Double = {
-    logpdf(x.toBreeze.toDenseVector)
+    val isSparse = x.isInstanceOf[SparseVector]
+    if (isSparse) {
+      logpdfSparse(x.asInstanceOf[SparseVector])
+    }
+    else logpdf(x.toBreeze.toDenseVector)
   }
-  
+
   /** Returns density of this multivariate Gaussian at given point, x */
   private[mllib] def pdf(x: DBV[Double]): Double = {
     math.exp(logpdf(x))
@@ -82,6 +92,15 @@ class MultivariateGaussian (
     u + v.t * v * -0.5
   }
   
+  private[mllib] def logpdfSparse(x: SparseVector): Double = {
+    val delta = - breezeMu
+    (x.indices zip x.values) map {
+      case(ind, val_) => delta(ind) += val_
+    }
+    val v = rootSigmaInv * delta
+    u + v.t * v * -0.5
+  }
+
   /**
    * Calculate distribution dependent components used for the density function:
    *    pdf(x) = (2*pi)^(-k/2)^ * det(sigma)^(-1/2)^ * exp((-1/2) * (x-mu).t * inv(sigma) * (x-mu))

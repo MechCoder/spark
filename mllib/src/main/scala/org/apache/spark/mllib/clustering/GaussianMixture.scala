@@ -21,7 +21,8 @@ import scala.collection.mutable.IndexedSeq
 
 import breeze.linalg.{DenseVector => BreezeVector, DenseMatrix => BreezeMatrix, diag, Transpose}
 
-import org.apache.spark.mllib.linalg.{Matrices, Vector, Vectors, DenseVector, DenseMatrix, BLAS}
+import org.apache.spark.mllib.linalg.{
+  Matrices, Vector, Vectors, DenseVector, DenseMatrix, BLAS, SparseVector}
 import org.apache.spark.mllib.stat.distribution.MultivariateGaussian
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
@@ -44,7 +45,7 @@ import org.apache.spark.util.Utils
  * is considered to have occurred.
  * @param maxIterations The maximum number of iterations to perform
  */
-class GaussianMixture private (
+class GaussianMixture private(
     private var k: Int, 
     private var convergenceTol: Double, 
     private var maxIterations: Int,
@@ -122,76 +123,145 @@ class GaussianMixture private (
   def run(data: RDD[Vector]): GaussianMixtureModel = {
     val sc = data.sparkContext
     
-    // we will operate on the data as breeze data
-    val breezeData = data.map(u => u.toBreeze.toDenseVector).cache()
-    
-    // Get length of the input vectors
-    val d = breezeData.first().length
-    
-    // Determine initial weights and corresponding Gaussians.
-    // If the user supplied an initial GMM, we use those values, otherwise
-    // we start with uniform weights, a random mean from the data, and
-    // diagonal covariance matrices using component variances
-    // derived from the samples    
-    val (weights, gaussians) = initialModel match {
-      case Some(gmm) => (gmm.weights, gmm.gaussians)
+    val firstVector = data.first()
+
+    // Get length of the input vectors.
+    val d = firstVector.size
+
+    val isSparse = firstVector.isInstanceOf[SparseVector]
+
+    if (!isSparse){
+      // we will operate on the data as breeze data
+      val breezeData = data.map(u => u.toBreeze.toDenseVector).cache()
       
-      case None => {
-        val samples = breezeData.takeSample(withReplacement = true, k * nSamples, seed)
-        (Array.fill(k)(1.0 / k), Array.tabulate(k) { i => 
-          val slice = samples.view(i * nSamples, (i + 1) * nSamples)
-          new MultivariateGaussian(vectorMean(slice), initCovariance(slice)) 
-        })  
+      // Determine initial weights and corresponding Gaussians.
+      // If the user supplied an initial GMM, we use those values, otherwise
+      // we start with uniform weights, a random mean from the data, and
+      // diagonal covariance matrices using component variances
+      // derived from the samples
+      val (weights, gaussians) = initialModel match {
+        case Some(gmm) => (gmm.weights, gmm.gaussians)
+
+        case None => {
+          val samples = breezeData.takeSample(withReplacement = true, k * nSamples, seed)
+          (Array.fill(k)(1.0 / k), Array.tabulate(k) { i =>
+            val slice = samples.view(i * nSamples, (i + 1) * nSamples)
+            new MultivariateGaussian(vectorMean(slice), initCovariance(slice))
+          })
+        }
       }
-    }
-    
-    var llh = Double.MinValue // current log-likelihood 
-    var llhp = 0.0            // previous log-likelihood
-    
-    var iter = 0
-    while(iter < maxIterations && Math.abs(llh-llhp) > convergenceTol) {
-      // create and broadcast curried cluster contribution function
-      val compute = sc.broadcast(ExpectationSum.add(weights, gaussians)_)
+
+      var llh = Double.MinValue // current log-likelihood
+      var llhp = 0.0            // previous log-likelihood
       
-      // aggregate the cluster contribution for all sample points
-      val sums = breezeData.aggregate(ExpectationSum.zero(k, d))(compute.value, _ += _)
-      
-      // Create new distributions based on the partial assignments
-      // (often referred to as the "M" step in literature)
-      val sumWeights = sums.weights.sum
-      var i = 0
-      while (i < k) {
-        val mu = sums.means(i) / sums.weights(i)
-        BLAS.syr(-sums.weights(i), Vectors.fromBreeze(mu).asInstanceOf[DenseVector],
-          Matrices.fromBreeze(sums.sigmas(i)).asInstanceOf[DenseMatrix])
-        weights(i) = sums.weights(i) / sumWeights
-        gaussians(i) = new MultivariateGaussian(mu, sums.sigmas(i) / sums.weights(i))
-        i = i + 1
+      var iter = 0
+
+      while(iter < maxIterations && Math.abs(llh-llhp) > convergenceTol) {
+        // create and broadcast curried cluster contribution function
+        val compute = sc.broadcast(ExpectationSum.add(weights, gaussians)_)
+
+        // aggregate the cluster contribution for all sample points
+        val sums = breezeData.aggregate(ExpectationSum.zero(k, d))(compute.value, _ += _)
+
+        // Create new distributions based on the partial assignments
+        // (often referred to as the "M" step in literature)
+        val sumWeights = sums.weights.sum
+        var i = 0
+        while (i < k) {
+          val mu = sums.means(i) / sums.weights(i)
+          BLAS.syr(-sums.weights(i), Vectors.fromBreeze(mu).asInstanceOf[DenseVector],
+            Matrices.fromBreeze(sums.sigmas(i)).asInstanceOf[DenseMatrix])
+          weights(i) = sums.weights(i) / sumWeights
+          gaussians(i) = new MultivariateGaussian(mu, sums.sigmas(i) / sums.weights(i))
+          i = i + 1
+        }
+
+        llhp = llh // current becomes previous
+        llh = sums.logLikelihood // this is the freshly computed log-likelihood
+        iter += 1
       }
-   
-      llhp = llh // current becomes previous
-      llh = sums.logLikelihood // this is the freshly computed log-likelihood
-      iter += 1
-    } 
-    
+      new GaussianMixtureModel(weights, gaussians)
+      }
+    else{
+
+      // We deal with indices and values, hence convergenceTol to SparseVector.
+      val sparseData = data.map(sample => sample.asInstanceOf[SparseVector])
+      val (weights, gaussians) = initialModel match {
+        case Some(gmm) => (gmm.weights, gmm.gaussians)
+        case None => {
+          val samples = sparseData.takeSample(withReplacement = true, k * nSamples, seed)
+          (Array.fill(k)(1.0 / k), Array.tabulate(k) { i =>
+            val slice = samples.slice(i * nSamples, (i + 1) * nSamples)
+            new MultivariateGaussian(vectorMean(slice), initCovariance(slice))
+          })
+        }
+      }
+
+      var llh = Double.MinValue // current log-likelihood
+      var llhp = 0.0            // previous log-likelihood
+      
+      var iter = 0
+      while(iter < maxIterations && Math.abs(llh-llhp) > convergenceTol) {
+        // create and broadcast curried cluster contribution function
+        val compute = sc.broadcast(ExpectationSum.addSparse(weights, gaussians)_)
+
+        // aggregate the cluster contribution for all sample points
+        val sums = sparseData.aggregate(ExpectationSum.zero(k, d))(compute.value, _ += _)
+
+        // Create new distributions based on the partial assignments
+        // (often referred to as the "M" step in literature)
+        val sumWeights = sums.weights.sum
+        var i = 0
+        while (i < k) {
+          val mu = sums.means(i) / sums.weights(i)
+          BLAS.syr(-sums.weights(i), Vectors.fromBreeze(mu).asInstanceOf[DenseVector],
+            Matrices.fromBreeze(sums.sigmas(i)).asInstanceOf[DenseMatrix])
+          weights(i) = sums.weights(i) / sumWeights
+          gaussians(i) = new MultivariateGaussian(mu, sums.sigmas(i) / sums.weights(i))
+          i = i + 1
+        }
+
+        llhp = llh // current becomes previous
+        llh = sums.logLikelihood // this is the freshly computed log-likelihood
+        iter += 1
+      }
     new GaussianMixtureModel(weights, gaussians)
-  }
-    
+    }
+
+}
+
   /** Average of dense breeze vectors */
-  private def vectorMean(x: IndexedSeq[BreezeVector[Double]]): BreezeVector[Double] = {
+  def vectorMean(x: IndexedSeq[BreezeVector[Double]]): BreezeVector[Double] = {
     val v = BreezeVector.zeros[Double](x(0).length)
     x.foreach(xi => v += xi)
     v / x.length.toDouble 
   }
-  
+
+  def vectorMean(x: Array[SparseVector]): BreezeVector[Double] = {
+    val v = BreezeVector.zeros[Double](x(0).size)
+    x.foreach(xi => (xi.indices zip xi.values) map {
+      case(ind, val_) => v(ind) += val_
+    })
+    v / x.length.toDouble
+  }
+
   /**
    * Construct matrix where diagonal entries are element-wise
    * variance of input vectors (computes biased variance)
    */
-  private def initCovariance(x: IndexedSeq[BreezeVector[Double]]): BreezeMatrix[Double] = {
+  def initCovariance(x: IndexedSeq[BreezeVector[Double]]): BreezeMatrix[Double] = {
     val mu = vectorMean(x)
     val ss = BreezeVector.zeros[Double](x(0).length)
     x.map(xi => (xi - mu) :^ 2.0).foreach(u => ss += u)
+    diag(ss / x.length.toDouble)
+  }
+
+  def initCovariance(x: Array[SparseVector]): BreezeMatrix[Double] = {
+    val mu = vectorMean(x)
+    val ss = BreezeVector.zeros[Double](x(0).size)
+    x.foreach(xi => (xi.indices zip xi.values) map {
+      case(ind, val_) => ss(ind) += (xi(ind) - mu(ind)) * (xi(ind) - mu(ind))
+    })
     diag(ss / x.length.toDouble)
   }
 }
@@ -214,7 +284,6 @@ private object ExpectationSum {
     }
     val pSum = p.sum
     sums.logLikelihood += math.log(pSum)
-    val xxt = x * new Transpose(x)
     var i = 0
     while (i < sums.k) {
       p(i) /= pSum
@@ -222,6 +291,28 @@ private object ExpectationSum {
       sums.means(i) += x * p(i)
       BLAS.syr(p(i), Vectors.fromBreeze(x).asInstanceOf[DenseVector],
         Matrices.fromBreeze(sums.sigmas(i)).asInstanceOf[DenseMatrix])
+      i = i + 1
+    }
+    sums
+  }
+
+  def addSparse(
+      weights: Array[Double],
+      dists: Array[MultivariateGaussian])
+      (sums: ExpectationSum, x: SparseVector): ExpectationSum = {
+    val p = weights.zip(dists).map {
+      case (weight, dist) => MLUtils.EPSILON + weight * dist.pdf(x)
+    }
+    val pSum = p.sum
+    sums.logLikelihood += math.log(pSum)
+    var i = 0
+    while (i < sums.k) {
+      p(i) /= pSum
+      sums.weights(i) += p(i)
+      (x.indices zip x.values) map {
+        case(ind, val_) => sums.means(i)(ind) += p(i) * val_
+      }
+      BLAS.syr(p(i), x, Matrices.fromBreeze(sums.sigmas(i)).asInstanceOf[DenseMatrix])
       i = i + 1
     }
     sums
@@ -247,5 +338,5 @@ private class ExpectationSum(
     }
     logLikelihood += x.logLikelihood
     this
-  }  
+  }
 }
