@@ -816,10 +816,83 @@ class DenseMatrix(Matrix):
         assert len(values) == numRows * numCols
         self.values = values
 
+    def __str__(self):
+        mattoarr = self.toArray()
+        matstr = ""
+        for row in mattoarr:
+            for ind, col in enumerate(row):
+                if ind != 0:
+                    matstr += "  "
+                matstr += str(col)
+            matstr += '\n'
+
+        return matstr[:-1]
+
+    def __repr__(self):
+        entries = ', '.join([_format_float(val) for val in self.values])
+        return "DenseMatrix({0}, {1}, [{2}], {3})".format(
+            self.numRows, self.numCols, entries, str(self.isTransposed))
+
     def __reduce__(self):
         return DenseMatrix, (
             self.numRows, self.numCols, self.values.tostring(),
             int(self.isTransposed))
+
+    def transpose(self):
+        """
+        Return a transposed matrix
+        """
+        return DenseMatrix(
+            self.numRows, self.numCols, self.values, not self.isTransposed)
+
+    @staticmethod
+    def zeros(numRows, numCols):
+        """
+        Returns a DenseMatrix of numRows X numCols filled with zeros.
+        """
+        return DenseMatrix(numRows, numCols, np.zeros(numRows * numCols))
+
+    @staticmethod
+    def ones(numRows, numCols):
+        """
+        Returns a DenseMatrix of numRows X numCols filled with ones. 
+        """
+        return DenseMatrix(numRows, numCols, np.ones(numRows * numCols))
+
+    @staticmethod
+    def eye(n):
+        """
+        Returns an Identity DenseMatrix
+        """
+        values = np.zeros(n * n)
+        values[: : n + 1] = 1.0
+        return DenseMatrix(n, n, values)
+
+    @staticmethod
+    def rand(numRows, numCols, rng):
+        """
+        Returns a DenseMatrix with values uniformly distributed.
+        """
+        return DenseMatrix(numRows, numCols, rng.rand(numRows * numCols))
+
+    @staticmethod
+    def randn(numRows, numCols, rng):
+        """
+        Returns a DenseMatrix filled with values normally distributed.
+        """
+        return DenseMatrix(numRows, numCols, rng.randn(numRows * numCols))
+
+    @staticmethod
+    def diag(vec):
+        """
+        Returns a DenseMatrix with values in the diagonal the same as that of
+        the vector supplied.
+        """
+        n = vec.array.size
+        values = np.zeros(n * n)
+        values[: : n + 1] = vec.array
+
+        return DenseMatrix(n, n, values)
 
     def toArray(self):
         """
@@ -896,6 +969,64 @@ class SparseMatrix(Matrix):
         if self.rowIndices.size != self.values.size:
             raise ValueError("Expected rowIndices of length %d, got %d."
                              % (self.rowIndices.size, self.values.size))
+
+    def transpose(self):
+        """
+        Return a transposed matrix
+        """
+        return SparseMatrix(
+            self.numRows, self.numCols, self.colPtrs, self.rowIndices,
+            self.values, not self.isTransposed)
+
+    @staticmethod
+    def speye(n):
+        """
+        Returns an Identity SparseMatrix
+        """
+        colPtrs = np.arange(n + 1)
+        rowIndices = np.arange(n)
+        values = np.ones(n)
+        return SparseMatrix(n, n, colPtrs, rowIndices, values)
+
+    @staticmethod
+    def spdiag(vec):
+        """
+        Returns a SparseMatrix with values in the diagonal the same as that of
+        the vector supplied.
+        """
+        n = vec.size
+        colPtrs = np.arange(n + 1)
+        rowIndices = np.arange(n)
+        return SparseMatrix(n, n, colPtrs, rowIndices, vec.array)
+
+    def __str__(self):
+        spstr = "{0} X {1} ".format(self.numRows, self.numCols)
+        if self.isTransposed:
+            spstr += "CSRMatrix\n"
+        else:
+            spstr += "CSCMatrix\n"
+
+        for i, colPtr in enumerate(self.colPtrs[:-1]):
+            endptr = self.colPtrs[i + 1]
+            values = self.values[colPtr: endptr]
+            rowindices = self.rowIndices[colPtr: endptr]
+            for j, rowInd in enumerate(rowindices):
+                if self.isTransposed:
+                    spstr += '({0},{1}) {2}\n'.format(
+                        i, rowInd, _format_float(values[j]))
+                else:
+                    spstr += '({0},{1}) {2}\n'.format(
+                        rowInd, i, _format_float(values[j]))
+
+        return spstr[:-1]
+
+    def __repr__(self):
+        colPtrs = ", ".join([str(i) for i in self.colPtrs])
+        rowIndices = ", ".join([str(i) for i in self.rowIndices])
+        values = ", ".join([_format_float(val) for val in self.values])
+        return "SparseMatrix({0}, {1}, [{2}], [{3}], [{4}], {5})".format(
+            self.numRows, self.numCols, colPtrs, rowIndices, values,
+            str(self.isTransposed))
 
     def __reduce__(self):
         return SparseMatrix, (
