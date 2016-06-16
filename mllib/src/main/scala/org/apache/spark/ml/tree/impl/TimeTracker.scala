@@ -28,6 +28,10 @@ private[spark] class TimeTracker extends Serializable {
 
   private val totals: MutableHashMap[String, Long] = new MutableHashMap[String, Long]()
 
+  def updateTime(timerLabel: String, value: Long): Unit = {
+    val currTime = totals.getOrElse(timerLabel, 0L)
+    totals(timerLabel) = currTime + value
+  }
   /**
    * Starts a new timer, or re-starts a stopped timer.
    */

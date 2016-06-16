@@ -537,17 +537,30 @@ private[spark] object RandomForest extends Logging {
       }
     }
 
-    val nodeToBestSplits = partitionAggregates.reduceByKey((a, b) => a.merge(b)).map {
+    timer.start("binsToBestSplitMaster")
+    timer.start("reduceByKey")
+    val nodeToBestSplitsR = partitionAggregates.reduceByKey((a, b) => a.merge(b))
+    nodeToBestSplitsR.collect()
+    timer.stop("reduceByKey")
+
+    val nodeToBestSplits1 = nodeToBestSplitsR.map {
       case (nodeIndex, aggStats) =>
+        val curr_time = System.nanoTime()
         val featuresForNode = nodeToFeaturesBc.value.flatMap { nodeToFeatures =>
           Some(nodeToFeatures(nodeIndex))
         }
 
         // find best split for each node
         val (split: Split, stats: ImpurityStats) =
-          binsToBestSplit(aggStats, splits, featuresForNode, nodes(nodeIndex))
-        (nodeIndex, (split, stats))
+          binsToBestSplit(aggStats, splits, featuresForNode, nodes(nodeIndex), timer)
+        val finishedTime = System.nanoTime() - curr_time
+        (nodeIndex, (split, stats, finishedTime))
     }.collectAsMap()
+    timer.stop("binsToBestSplitMaster")
+
+    val nodeToBestSplits = nodeToBestSplits1.map { case(k, v) => (k, (v._1, v._2)) }
+    val binsToBestSplitTime = nodeToBestSplits1.map { case(k, v) => v._3 }.reduce(_ + _)
+    timer.updateTime("binsToBestSplit", binsToBestSplitTime.toLong)
 
     timer.stop("chooseSplits")
 
@@ -682,7 +695,7 @@ private[spark] object RandomForest extends Logging {
       binAggregates: DTStatsAggregator,
       splits: Array[Array[Split]],
       featuresForNode: Option[Array[Int]],
-      node: LearningNode): (Split, ImpurityStats) = {
+      node: LearningNode, timer: TimeTracker): (Split, ImpurityStats) = {
 
     // Calculate InformationGain and ImpurityStats if current node is top node
     val level = LearningNode.indexToLevel(node.id)
@@ -692,6 +705,7 @@ private[spark] object RandomForest extends Logging {
       node.stats
     }
 
+    timer.start("ImpurityCalculator")
     // For each (feature, split), calculate the gain, and select the best (feature, split).
     val (bestSplit, bestSplitStats) =
       Range(0, binAggregates.metadata.numFeaturesPerNode).map { featureIndexIdx =>
@@ -718,8 +732,10 @@ private[spark] object RandomForest extends Logging {
               val rightChildStats =
                 binAggregates.getImpurityCalculator(nodeFeatureOffset, numSplits)
               rightChildStats.subtract(leftChildStats)
+              timer.start("calculateImpurityStats")
               gainAndImpurityStats = calculateImpurityStats(gainAndImpurityStats,
                 leftChildStats, rightChildStats, binAggregates.metadata)
+              timer.stop("calculateImpurityStats")
               (splitIdx, gainAndImpurityStats)
             }.maxBy(_._2.gain)
           (splits(featureIndex)(bestFeatureSplitIndex), bestFeatureGainStats)
@@ -728,11 +744,15 @@ private[spark] object RandomForest extends Logging {
           val leftChildOffset = binAggregates.getFeatureOffset(featureIndexIdx)
           val (bestFeatureSplitIndex, bestFeatureGainStats) =
             Range(0, numSplits).map { splitIndex =>
+              timer.start("ImpurityCalculator")
               val leftChildStats = binAggregates.getImpurityCalculator(leftChildOffset, splitIndex)
               val rightChildStats = binAggregates.getParentImpurityCalculator()
                 .subtract(leftChildStats)
+              timer.stop("ImpurityCalculator")
+              timer.start("calculateImpurityStats")
               gainAndImpurityStats = calculateImpurityStats(gainAndImpurityStats,
                 leftChildStats, rightChildStats, binAggregates.metadata)
+              timer.stop("calculateImpurityStats")
               (splitIndex, gainAndImpurityStats)
             }.maxBy(_._2.gain)
           (splits(featureIndex)(bestFeatureSplitIndex), bestFeatureGainStats)
@@ -748,8 +768,10 @@ private[spark] object RandomForest extends Logging {
            * centroidForCategories is a list: (category, centroid)
            */
           val centroidForCategories = Range(0, numCategories).map { case featureValue =>
+            timer.start("ImpurityCalculator")
             val categoryStats =
               binAggregates.getImpurityCalculator(nodeFeatureOffset, featureValue)
+            timer.stop("ImpurityCalculator")
             val centroid = if (categoryStats.count != 0) {
               if (binAggregates.metadata.isMulticlass) {
                 // multiclass classification
@@ -797,13 +819,17 @@ private[spark] object RandomForest extends Logging {
           val (bestFeatureSplitIndex, bestFeatureGainStats) =
             Range(0, numSplits).map { splitIndex =>
               val featureValue = categoriesSortedByCentroid(splitIndex)._1
+              timer.start("ImpurityCalculator")
               val leftChildStats =
                 binAggregates.getImpurityCalculator(nodeFeatureOffset, featureValue)
               val rightChildStats =
                 binAggregates.getImpurityCalculator(nodeFeatureOffset, lastCategory)
+              timer.stop("ImpurityCalculator")
               rightChildStats.subtract(leftChildStats)
+              timer.start("calculateImpurityStats")
               gainAndImpurityStats = calculateImpurityStats(gainAndImpurityStats,
                 leftChildStats, rightChildStats, binAggregates.metadata)
+              timer.stop("calculateImpurityStats")
               (splitIndex, gainAndImpurityStats)
             }.maxBy(_._2.gain)
           val categoriesForSplit =
@@ -813,7 +839,7 @@ private[spark] object RandomForest extends Logging {
           (bestFeatureSplit, bestFeatureGainStats)
         }
       }.maxBy(_._2.gain)
-
+    timer.stop("ImpurityCalculator")
     (bestSplit, bestSplitStats)
   }
 
