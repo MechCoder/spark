@@ -18,7 +18,7 @@
 package org.apache.spark.mllib.tree
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.mllib.tree.impurity.{EntropyAggregator, GiniAggregator}
+import org.apache.spark.mllib.tree.impurity.{EntropyAggregator, Gini, GiniAggregator}
 
 /**
  * Test suites for [[GiniAggregator]] and [[EntropyAggregator]].
@@ -37,4 +37,13 @@ class ImpuritySuite extends SparkFunSuite {
       entropy.update(Array(0.0, 1.0, 2.0), 0, -1, 0.0)
     }
   }
+
+  test("Gini ") {
+    val counts = Array(1.0, 2.0, 4.0)
+    val impurity = Gini.calculate(counts, 7)
+    val newCounts = Array(3.0, 5.0, 7.0, 1.0, 2.0, 4.0)
+    val newImpurity = Gini.calculate(counts, 0, 3)
+    assert(newImpurity === impurity)
+  }
+
 }

@@ -57,6 +57,35 @@ object Entropy extends Impurity {
     impurity
   }
 
+  @Since("1.1.0")
+  @DeveloperApi
+  override def calculate(stats: Array[Double], start: Int, statsSize: Int): Double = {
+    var index = start
+    val endIndex = start + statsSize
+    var totalCount = 0.0
+    while (index < endIndex) {
+      totalCount += stats(index)
+      index += 1
+    }
+
+    if (totalCount == 0) {
+      return 0
+    }
+
+    var impurity = 0.0
+    index = start
+    while (index < endIndex) {
+      val classCount = stats(index)
+      if (classCount != 0) {
+        val freq = classCount / totalCount
+        impurity -= freq * log2(freq)
+      }
+      index += 1
+    }
+    impurity
+  }
+
+
   /**
    * :: DeveloperApi ::
    * variance calculation
@@ -111,7 +140,7 @@ private[spark] class EntropyAggregator(numClasses: Int)
    * @param offset    Start index of stats for this (node, feature, bin).
    */
   def getCalculator(allStats: Array[Double], offset: Int): EntropyCalculator = {
-    new EntropyCalculator(allStats.view(offset, offset + statsSize).toArray)
+    new EntropyCalculator(allStats, offset, numClasses)
   }
 }
 
@@ -121,12 +150,15 @@ private[spark] class EntropyAggregator(numClasses: Int)
  * (node, feature, bin).
  * @param stats  Array of sufficient statistics for a (node, feature, bin).
  */
-private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCalculator(stats) {
+private[spark] class EntropyCalculator(
+  stats: Array[Double],
+  start: Int,
+  statsSize: Int) extends ImpurityCalculator(stats, start, statsSize) {
 
   /**
    * Make a deep copy of this [[ImpurityCalculator]].
    */
-  def copy: EntropyCalculator = new EntropyCalculator(stats.clone())
+  def copy: EntropyCalculator = new EntropyCalculator(stats.clone(), start, statsSize)
 
   /**
    * Calculate the impurity from the stored sufficient statistics.
@@ -136,7 +168,16 @@ private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCal
   /**
    * Number of data points accounted for in the sufficient statistics.
    */
-  def count: Long = stats.sum.toLong
+  def count: Long = {
+    var startIndex = start
+    var endIndex = start + statsSize
+    var numSamples = 0.0
+    while (startIndex < endIndex) {
+      numSamples += stats(startIndex)
+      startIndex += 1
+    }
+    numSamples.toLong
+  }
 
   /**
    * Prediction which should be made based on the sufficient statistics.
@@ -144,7 +185,7 @@ private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCal
   def predict: Double = if (count == 0) {
     0
   } else {
-    indexOfLargestArrayElement(stats)
+    indexOfLargestArrayElement(stats, start, start + statsSize)
   }
 
   /**
@@ -152,14 +193,14 @@ private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCal
    */
   override def prob(label: Double): Double = {
     val lbl = label.toInt
-    require(lbl < stats.length,
+    require(lbl < statsSize,
       s"EntropyCalculator.prob given invalid label: $lbl (should be < ${stats.length}")
     require(lbl >= 0, "Entropy does not support negative labels")
     val cnt = count
     if (cnt == 0) {
       0
     } else {
-      stats(lbl) / cnt
+      stats(lbl + start) / cnt
     }
   }
 

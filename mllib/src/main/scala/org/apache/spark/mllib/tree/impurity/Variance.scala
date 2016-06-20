@@ -57,6 +57,10 @@ object Variance extends Impurity {
     squaredLoss / count
   }
 
+  @DeveloperApi
+  def calculate(stats: Array[Double], start: Int, statsSize: Int): Double =
+    throw new UnsupportedOperationException("Variance.calculate")
+
   /**
    * Get this impurity instance.
    * This is useful for passing impurity parameters to a Strategy in Java.
@@ -91,7 +95,7 @@ private[spark] class VarianceAggregator()
    * @param offset    Start index of stats for this (node, feature, bin).
    */
   def getCalculator(allStats: Array[Double], offset: Int): VarianceCalculator = {
-    new VarianceCalculator(allStats.view(offset, offset + statsSize).toArray)
+    new VarianceCalculator(allStats, offset, 3)
   }
 }
 
@@ -101,26 +105,29 @@ private[spark] class VarianceAggregator()
  * (node, feature, bin).
  * @param stats  Array of sufficient statistics for a (node, feature, bin).
  */
-private[spark] class VarianceCalculator(stats: Array[Double]) extends ImpurityCalculator(stats) {
+private[spark] class VarianceCalculator(
+  stats: Array[Double],
+  start: Int,
+  statsSize: Int) extends ImpurityCalculator(stats, start, statsSize) {
 
-  require(stats.length == 3,
+  require(statsSize == 3,
     s"VarianceCalculator requires sufficient statistics array stats to be of length 3," +
     s" but was given array of length ${stats.length}.")
 
   /**
    * Make a deep copy of this [[ImpurityCalculator]].
    */
-  def copy: VarianceCalculator = new VarianceCalculator(stats.clone())
+  def copy: VarianceCalculator = new VarianceCalculator(stats.clone(), start, statsSize)
 
   /**
    * Calculate the impurity from the stored sufficient statistics.
    */
-  def calculate(): Double = Variance.calculate(stats(0), stats(1), stats(2))
+  def calculate(): Double = Variance.calculate(stats(start), stats(start + 1), stats(start + 2))
 
   /**
    * Number of data points accounted for in the sufficient statistics.
    */
-  def count: Long = stats(0).toLong
+  def count: Long = stats(start).toLong
 
   /**
    * Prediction which should be made based on the sufficient statistics.
