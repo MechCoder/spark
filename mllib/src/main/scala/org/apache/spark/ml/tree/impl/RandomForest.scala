@@ -537,7 +537,7 @@ private[spark] object RandomForest extends Logging {
       }
     }
 
-    val nodeToBestSplitsR = partitionAggregates.reduceByKey((a, b) => a.merge(b)).map {
+    val nodeToBestSplits = partitionAggregates.reduceByKey((a, b) => a.merge(b)).map {
       case (nodeIndex, aggStats) =>
         val featuresForNode = nodeToFeaturesBc.value.flatMap { nodeToFeatures =>
           Some(nodeToFeatures(nodeIndex))
@@ -545,7 +545,7 @@ private[spark] object RandomForest extends Logging {
 
         // find best split for each node
         val (split: Split, stats: ImpurityStats) =
-          binsToBestSplit(aggStats, splits, featuresForNode, nodes(nodeIndex), timer)
+          binsToBestSplit(aggStats, splits, featuresForNode, nodes(nodeIndex))
         (nodeIndex, (split, stats))
     }.collectAsMap()
 

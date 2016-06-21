@@ -38,29 +38,29 @@ class DecisionTreeSuite extends SparkFunSuite with MLlibTestSparkContext {
   // Tests calling train()
   /////////////////////////////////////////////////////////////////////////////
 
-  // test("Binary classification stump with ordered categorical features") {
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPoints()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(
-  //     Classification,
-  //     Gini,
-  //     numClasses = 2,
-  //     maxDepth = 2,
-  //     maxBins = 100,
-  //     categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
+  test("Binary classification stump with ordered categorical features") {
+    val arr = DecisionTreeSuite.generateCategoricalDataPoints()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(
+      Classification,
+      Gini,
+      numClasses = 2,
+      maxDepth = 2,
+      maxBins = 100,
+      categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-    // val split = rootNode.split.get
-    // assert(split.categories === List(1.0))
-    // assert(split.featureType === Categorical)
+    val split = rootNode.split.get
+    assert(split.categories === List(1.0))
+    assert(split.featureType === Categorical)
 
-    // val stats = rootNode.stats.get
-    // assert(stats.gain > 0)
-    // assert(rootNode.predict.predict === 1)
-    // assert(stats.impurity > 0.2)
-  // }
+    val stats = rootNode.stats.get
+    assert(stats.gain > 0)
+    assert(rootNode.predict.predict === 1)
+    assert(stats.impurity > 0.2)
+  }
 
   test("Regression stump with 3-ary (ordered) categorical features") {
     val arr = DecisionTreeSuite.generateCategoricalDataPoints()
@@ -79,357 +79,357 @@ class DecisionTreeSuite extends SparkFunSuite with MLlibTestSparkContext {
 
     val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-    // val split = rootNode.split.get
-    // assert(split.categories.length === 1)
-    // assert(split.categories.contains(1.0))
-    // assert(split.featureType === Categorical)
+    val split = rootNode.split.get
+    assert(split.categories.length === 1)
+    assert(split.categories.contains(1.0))
+    assert(split.featureType === Categorical)
 
-    // val stats = rootNode.stats.get
-    // assert(stats.gain > 0)
-    // assert(rootNode.predict.predict === 0.6)
-    // assert(stats.impurity > 0.2)
+    val stats = rootNode.stats.get
+    assert(stats.gain > 0)
+    assert(rootNode.predict.predict === 0.6)
+    assert(stats.impurity > 0.2)
   }
 
-  // test("Regression stump with binary (ordered) categorical features") {
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPoints()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(
-  //     Regression,
-  //     Variance,
-  //     maxDepth = 2,
-  //     maxBins = 100,
-  //     categoricalFeaturesInfo = Map(0 -> 2, 1 -> 2))
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Regression stump with binary (ordered) categorical features") {
+    val arr = DecisionTreeSuite.generateCategoricalDataPoints()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(
+      Regression,
+      Variance,
+      maxDepth = 2,
+      maxBins = 100,
+      categoricalFeaturesInfo = Map(0 -> 2, 1 -> 2))
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateRegressor(model, arr, 0.0)
-  //   assert(model.numNodes === 3)
-  //   assert(model.depth === 1)
-  // }
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateRegressor(model, arr, 0.0)
+    assert(model.numNodes === 3)
+    assert(model.depth === 1)
+  }
 
-  // test("Binary classification stump with fixed label 0 for Gini") {
-  //   val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel0()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(Classification, Gini, maxDepth = 3,
-  //     numClasses = 2, maxBins = 100)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Binary classification stump with fixed label 0 for Gini") {
+    val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel0()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(Classification, Gini, maxDepth = 3,
+      numClasses = 2, maxBins = 100)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   assert(rootNode.impurity === 0)
-  //   assert(rootNode.stats.isEmpty)
-  //   assert(rootNode.predict.predict === 0)
-  // }
+    assert(rootNode.impurity === 0)
+    assert(rootNode.stats.isEmpty)
+    assert(rootNode.predict.predict === 0)
+  }
 
-  // test("Binary classification stump with fixed label 1 for Gini") {
-  //   val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel1()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(Classification, Gini, maxDepth = 3,
-  //     numClasses = 2, maxBins = 100)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Binary classification stump with fixed label 1 for Gini") {
+    val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel1()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(Classification, Gini, maxDepth = 3,
+      numClasses = 2, maxBins = 100)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   assert(rootNode.impurity === 0)
-  //   assert(rootNode.stats.isEmpty)
-  //   assert(rootNode.predict.predict === 1)
-  // }
+    assert(rootNode.impurity === 0)
+    assert(rootNode.stats.isEmpty)
+    assert(rootNode.predict.predict === 1)
+  }
 
-  // test("Binary classification stump with fixed label 0 for Entropy") {
-  //   val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel0()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(Classification, Entropy, maxDepth = 3,
-  //     numClasses = 2, maxBins = 100)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Binary classification stump with fixed label 0 for Entropy") {
+    val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel0()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(Classification, Entropy, maxDepth = 3,
+      numClasses = 2, maxBins = 100)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   assert(rootNode.impurity === 0)
-  //   assert(rootNode.stats.isEmpty)
-  //   assert(rootNode.predict.predict === 0)
-  // }
+    assert(rootNode.impurity === 0)
+    assert(rootNode.stats.isEmpty)
+    assert(rootNode.predict.predict === 0)
+  }
 
-  // test("Binary classification stump with fixed label 1 for Entropy") {
-  //   val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel1()
-  //   assert(arr.length === 1000)
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(Classification, Entropy, maxDepth = 3,
-  //     numClasses = 2, maxBins = 100)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Binary classification stump with fixed label 1 for Entropy") {
+    val arr = DecisionTreeSuite.generateOrderedLabeledPointsWithLabel1()
+    assert(arr.length === 1000)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(Classification, Entropy, maxDepth = 3,
+      numClasses = 2, maxBins = 100)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   assert(rootNode.impurity === 0)
-  //   assert(rootNode.stats.isEmpty)
-  //   assert(rootNode.predict.predict === 1)
-  // }
+    assert(rootNode.impurity === 0)
+    assert(rootNode.stats.isEmpty)
+    assert(rootNode.predict.predict === 1)
+  }
 
-  // test("Multiclass classification stump with 3-ary (unordered) categorical features") {
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlass()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(strategy.isMulticlassClassification)
-  //   assert(metadata.isUnordered(featureIndex = 0))
-  //   assert(metadata.isUnordered(featureIndex = 1))
+  test("Multiclass classification stump with 3-ary (unordered) categorical features") {
+    val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlass()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(strategy.isMulticlassClassification)
+    assert(metadata.isUnordered(featureIndex = 0))
+    assert(metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   val split = rootNode.split.get
-  //   assert(split.feature === 0)
-  //   assert(split.categories.length === 1)
-  //   assert(split.categories.contains(1))
-  //   assert(split.featureType === Categorical)
-  // }
+    val split = rootNode.split.get
+    assert(split.feature === 0)
+    assert(split.categories.length === 1)
+    assert(split.categories.contains(1))
+    assert(split.featureType === Categorical)
+  }
 
-  // test("Binary classification stump with 1 continuous feature, to check off-by-1 error") {
-  //   val arr = Array(
-  //     LabeledPoint(0.0, Vectors.dense(0.0)),
-  //     LabeledPoint(1.0, Vectors.dense(1.0)),
-  //     LabeledPoint(1.0, Vectors.dense(2.0)),
-  //     LabeledPoint(1.0, Vectors.dense(3.0)))
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 2)
+  test("Binary classification stump with 1 continuous feature, to check off-by-1 error") {
+    val arr = Array(
+      LabeledPoint(0.0, Vectors.dense(0.0)),
+      LabeledPoint(1.0, Vectors.dense(1.0)),
+      LabeledPoint(1.0, Vectors.dense(2.0)),
+      LabeledPoint(1.0, Vectors.dense(3.0)))
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 2)
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 1.0)
-  //   assert(model.numNodes === 3)
-  //   assert(model.depth === 1)
-  // }
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 1.0)
+    assert(model.numNodes === 3)
+    assert(model.depth === 1)
+  }
 
-  // test("Binary classification stump with 2 continuous features") {
-  //   val arr = Array(
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
-  //     LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
-  //     LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 2.0)))))
+  test("Binary classification stump with 2 continuous features") {
+    val arr = Array(
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
+      LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
+      LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 2.0)))))
 
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 2)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 2)
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 1.0)
-  //   assert(model.numNodes === 3)
-  //   assert(model.depth === 1)
-  //   assert(model.topNode.split.get.feature === 1)
-  // }
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 1.0)
+    assert(model.numNodes === 3)
+    assert(model.depth === 1)
+    assert(model.topNode.split.get.feature === 1)
+  }
 
-  // test("Multiclass classification stump with unordered categorical features," +
-  //   " with just enough bins") {
-  //   val maxBins = 2 * (math.pow(2, 3 - 1).toInt - 1)
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlass()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, maxBins = maxBins,
-  //     categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
-  //   assert(strategy.isMulticlassClassification)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(metadata.isUnordered(featureIndex = 0))
-  //   assert(metadata.isUnordered(featureIndex = 1))
+  test("Multiclass classification stump with unordered categorical features," +
+    " with just enough bins") {
+    val maxBins = 2 * (math.pow(2, 3 - 1).toInt - 1)
+    val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlass()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, maxBins = maxBins,
+      categoricalFeaturesInfo = Map(0 -> 3, 1 -> 3))
+    assert(strategy.isMulticlassClassification)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(metadata.isUnordered(featureIndex = 0))
+    assert(metadata.isUnordered(featureIndex = 1))
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 1.0)
-  //   assert(model.numNodes === 3)
-  //   assert(model.depth === 1)
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 1.0)
+    assert(model.numNodes === 3)
+    assert(model.depth === 1)
 
-  //   val rootNode = model.topNode
+    val rootNode = model.topNode
 
-  //   val split = rootNode.split.get
-  //   assert(split.feature === 0)
-  //   assert(split.categories.length === 1)
-  //   assert(split.categories.contains(1))
-  //   assert(split.featureType === Categorical)
+    val split = rootNode.split.get
+    assert(split.feature === 0)
+    assert(split.categories.length === 1)
+    assert(split.categories.contains(1))
+    assert(split.featureType === Categorical)
 
-  //   val gain = rootNode.stats.get
-  //   assert(gain.leftImpurity === 0)
-  //   assert(gain.rightImpurity === 0)
-  // }
+    val gain = rootNode.stats.get
+    assert(gain.leftImpurity === 0)
+    assert(gain.rightImpurity === 0)
+  }
 
-  // test("Multiclass classification stump with continuous features") {
-  //   val arr = DecisionTreeSuite.generateContinuousDataPointsForMulticlass()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, maxBins = 100)
-  //   assert(strategy.isMulticlassClassification)
+  test("Multiclass classification stump with continuous features") {
+    val arr = DecisionTreeSuite.generateContinuousDataPointsForMulticlass()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, maxBins = 100)
+    assert(strategy.isMulticlassClassification)
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 0.9)
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 0.9)
 
-  //   val rootNode = model.topNode
+    val rootNode = model.topNode
 
-  //   val split = rootNode.split.get
-  //   assert(split.feature === 1)
-  //   assert(split.featureType === Continuous)
-  //   assert(split.threshold > 1980)
-  //   assert(split.threshold < 2020)
+    val split = rootNode.split.get
+    assert(split.feature === 1)
+    assert(split.featureType === Continuous)
+    assert(split.threshold > 1980)
+    assert(split.threshold < 2020)
 
-  // }
+  }
 
-  // test("Multiclass classification stump with continuous + unordered categorical features") {
-  //   val arr = DecisionTreeSuite.generateContinuousDataPointsForMulticlass()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, maxBins = 100, categoricalFeaturesInfo = Map(0 -> 3))
-  //   assert(strategy.isMulticlassClassification)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(metadata.isUnordered(featureIndex = 0))
+  test("Multiclass classification stump with continuous + unordered categorical features") {
+    val arr = DecisionTreeSuite.generateContinuousDataPointsForMulticlass()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, maxBins = 100, categoricalFeaturesInfo = Map(0 -> 3))
+    assert(strategy.isMulticlassClassification)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(metadata.isUnordered(featureIndex = 0))
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 0.9)
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 0.9)
 
-  //   val rootNode = model.topNode
+    val rootNode = model.topNode
 
-  //   val split = rootNode.split.get
-  //   assert(split.feature === 1)
-  //   assert(split.featureType === Continuous)
-  //   assert(split.threshold > 1980)
-  //   assert(split.threshold < 2020)
-  // }
+    val split = rootNode.split.get
+    assert(split.feature === 1)
+    assert(split.featureType === Continuous)
+    assert(split.threshold > 1980)
+    assert(split.threshold < 2020)
+  }
 
-  // test("Multiclass classification stump with 10-ary (ordered) categorical features") {
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlassForOrderedFeatures()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, maxBins = 100,
-  //     categoricalFeaturesInfo = Map(0 -> 10, 1 -> 10))
-  //   assert(strategy.isMulticlassClassification)
-  //   val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
-  //   assert(!metadata.isUnordered(featureIndex = 0))
-  //   assert(!metadata.isUnordered(featureIndex = 1))
+  test("Multiclass classification stump with 10-ary (ordered) categorical features") {
+    val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlassForOrderedFeatures()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, maxBins = 100,
+      categoricalFeaturesInfo = Map(0 -> 10, 1 -> 10))
+    assert(strategy.isMulticlassClassification)
+    val metadata = DecisionTreeMetadata.buildMetadata(rdd.map(_.asML), strategy)
+    assert(!metadata.isUnordered(featureIndex = 0))
+    assert(!metadata.isUnordered(featureIndex = 1))
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   val split = rootNode.split.get
-  //   assert(split.feature === 0)
-  //   assert(split.categories.length === 1)
-  //   assert(split.categories.contains(1.0))
-  //   assert(split.featureType === Categorical)
-  // }
+    val split = rootNode.split.get
+    assert(split.feature === 0)
+    assert(split.categories.length === 1)
+    assert(split.categories.contains(1.0))
+    assert(split.featureType === Categorical)
+  }
 
-  // test("Multiclass classification tree with 10-ary (ordered) categorical features," +
-  //     " with just enough bins") {
-  //   val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlassForOrderedFeatures()
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
-  //     numClasses = 3, maxBins = 10,
-  //     categoricalFeaturesInfo = Map(0 -> 10, 1 -> 10))
-  //   assert(strategy.isMulticlassClassification)
+  test("Multiclass classification tree with 10-ary (ordered) categorical features," +
+      " with just enough bins") {
+    val arr = DecisionTreeSuite.generateCategoricalDataPointsForMulticlassForOrderedFeatures()
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 4,
+      numClasses = 3, maxBins = 10,
+      categoricalFeaturesInfo = Map(0 -> 10, 1 -> 10))
+    assert(strategy.isMulticlassClassification)
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   DecisionTreeSuite.validateClassifier(model, arr, 0.6)
-  // }
+    val model = DecisionTree.train(rdd, strategy)
+    DecisionTreeSuite.validateClassifier(model, arr, 0.6)
+  }
 
-  // test("split must satisfy min instances per node requirements") {
-  //   val arr = Array(
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
-  //     LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 1.0)))))
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini,
-  //     maxDepth = 2, numClasses = 2, minInstancesPerNode = 2)
+  test("split must satisfy min instances per node requirements") {
+    val arr = Array(
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
+      LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 1.0)))))
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini,
+      maxDepth = 2, numClasses = 2, minInstancesPerNode = 2)
 
-  //   val model = DecisionTree.train(rdd, strategy)
-  //   assert(model.topNode.isLeaf)
-  //   assert(model.topNode.predict.predict == 0.0)
-  //   val predicts = rdd.map(p => model.predict(p.features)).collect()
-  //   predicts.foreach { predict =>
-  //     assert(predict == 0.0)
-  //   }
+    val model = DecisionTree.train(rdd, strategy)
+    assert(model.topNode.isLeaf)
+    assert(model.topNode.predict.predict == 0.0)
+    val predicts = rdd.map(p => model.predict(p.features)).collect()
+    predicts.foreach { predict =>
+      assert(predict == 0.0)
+    }
 
-  //   // test when no valid split can be found
-  //   val rootNode = model.topNode
+    // test when no valid split can be found
+    val rootNode = model.topNode
 
-  //   assert(rootNode.stats.isEmpty)
-  // }
+    assert(rootNode.stats.isEmpty)
+  }
 
-  // test("do not choose split that does not satisfy min instance per node requirements") {
-  //   // if a split does not satisfy min instances per node requirements,
-  //   // this split is invalid, even though the information gain of split is large.
-  //   val arr = Array(
-  //     LabeledPoint(0.0, Vectors.dense(0.0, 1.0)),
-  //     LabeledPoint(1.0, Vectors.dense(1.0, 1.0)),
-  //     LabeledPoint(0.0, Vectors.dense(0.0, 0.0)),
-  //     LabeledPoint(0.0, Vectors.dense(0.0, 0.0)))
+  test("do not choose split that does not satisfy min instance per node requirements") {
+    // if a split does not satisfy min instances per node requirements,
+    // this split is invalid, even though the information gain of split is large.
+    val arr = Array(
+      LabeledPoint(0.0, Vectors.dense(0.0, 1.0)),
+      LabeledPoint(1.0, Vectors.dense(1.0, 1.0)),
+      LabeledPoint(0.0, Vectors.dense(0.0, 0.0)),
+      LabeledPoint(0.0, Vectors.dense(0.0, 0.0)))
 
-  //   val rdd = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini,
-  //     maxBins = 2, maxDepth = 2, categoricalFeaturesInfo = Map(0 -> 2, 1 -> 2),
-  //     numClasses = 2, minInstancesPerNode = 2)
+    val rdd = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini,
+      maxBins = 2, maxDepth = 2, categoricalFeaturesInfo = Map(0 -> 2, 1 -> 2),
+      numClasses = 2, minInstancesPerNode = 2)
 
-  //   val rootNode = DecisionTree.train(rdd, strategy).topNode
+    val rootNode = DecisionTree.train(rdd, strategy).topNode
 
-  //   val split = rootNode.split.get
-  //   val gainStats = rootNode.stats.get
-  //   assert(split.feature == 1)
-  //   assert(gainStats.gain >= 0)
-  //   assert(gainStats.impurity >= 0)
-  // }
+    val split = rootNode.split.get
+    val gainStats = rootNode.stats.get
+    assert(split.feature == 1)
+    assert(gainStats.gain >= 0)
+    assert(gainStats.impurity >= 0)
+  }
 
-  // test("split must satisfy min info gain requirements") {
-  //   val arr = Array(
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
-  //     LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
-  //     LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 1.0)))))
+  test("split must satisfy min info gain requirements") {
+    val arr = Array(
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 0.0)))),
+      LabeledPoint(1.0, Vectors.sparse(2, Seq((1, 1.0)))),
+      LabeledPoint(0.0, Vectors.sparse(2, Seq((0, 1.0)))))
 
-  //   val input = sc.parallelize(arr)
-  //   val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 2,
-  //     numClasses = 2, minInfoGain = 1.0)
+    val input = sc.parallelize(arr)
+    val strategy = new Strategy(algo = Classification, impurity = Gini, maxDepth = 2,
+      numClasses = 2, minInfoGain = 1.0)
 
-  //   val model = DecisionTree.train(input, strategy)
-  //   assert(model.topNode.isLeaf)
-  //   assert(model.topNode.predict.predict == 0.0)
-  //   val predicts = input.map(p => model.predict(p.features)).collect()
-  //   predicts.foreach { predict =>
-  //     assert(predict == 0.0)
-  //   }
+    val model = DecisionTree.train(input, strategy)
+    assert(model.topNode.isLeaf)
+    assert(model.topNode.predict.predict == 0.0)
+    val predicts = input.map(p => model.predict(p.features)).collect()
+    predicts.foreach { predict =>
+      assert(predict == 0.0)
+    }
 
-  //   // test when no valid split can be found
-  //   assert(model.topNode.stats.isEmpty)
-  // }
+    // test when no valid split can be found
+    assert(model.topNode.stats.isEmpty)
+  }
 
-  // /////////////////////////////////////////////////////////////////////////////
-  // // Tests of model save/load
-  // /////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // Tests of model save/load
+  /////////////////////////////////////////////////////////////////////////////
 
-  // test("Node.subtreeIterator") {
-  //   val model = DecisionTreeSuite.createModel(Classification)
-  //   val nodeIds = model.topNode.subtreeIterator.map(_.id).toArray.sorted
-  //   assert(nodeIds === DecisionTreeSuite.createdModelNodeIds)
-  // }
+  test("Node.subtreeIterator") {
+    val model = DecisionTreeSuite.createModel(Classification)
+    val nodeIds = model.topNode.subtreeIterator.map(_.id).toArray.sorted
+    assert(nodeIds === DecisionTreeSuite.createdModelNodeIds)
+  }
 
-  // test("model save/load") {
-  //   val tempDir = Utils.createTempDir()
-  //   val path = tempDir.toURI.toString
+  test("model save/load") {
+    val tempDir = Utils.createTempDir()
+    val path = tempDir.toURI.toString
 
-  //   Array(Classification, Regression).foreach { algo =>
-  //     val model = DecisionTreeSuite.createModel(algo)
-  //     // Save model, load it back, and compare.
-  //     try {
-  //       model.save(sc, path)
-  //       val sameModel = DecisionTreeModel.load(sc, path)
-  //       DecisionTreeSuite.checkEqual(model, sameModel)
-  //     } finally {
-  //       Utils.deleteRecursively(tempDir)
-  //     }
-  //   }
-  // }
+    Array(Classification, Regression).foreach { algo =>
+      val model = DecisionTreeSuite.createModel(algo)
+      // Save model, load it back, and compare.
+      try {
+        model.save(sc, path)
+        val sameModel = DecisionTreeModel.load(sc, path)
+        DecisionTreeSuite.checkEqual(model, sameModel)
+      } finally {
+        Utils.deleteRecursively(tempDir)
+      }
+    }
+  }
 }
 
 object DecisionTreeSuite extends SparkFunSuite {
