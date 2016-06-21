@@ -135,7 +135,7 @@ private[spark] class VarianceCalculator(
   def predict: Double = if (count == 0) {
     0
   } else {
-    stats(1) / count
+    stats(start + 1) / count
   }
 
   override def toString: String = {

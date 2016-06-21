@@ -189,7 +189,7 @@ private[spark] abstract class ImpurityCalculator(
       }
       index += 1
     }
-    index
+    largest
   }
 
 }
