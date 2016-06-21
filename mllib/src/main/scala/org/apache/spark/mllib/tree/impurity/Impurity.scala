@@ -188,7 +188,7 @@ private[spark] object ImpurityCalculator {
   def getCalculator(impurity: String, stats: Array[Double]): ImpurityCalculator = {
     impurity match {
       case "gini" => new GiniCalculator(stats, stats, 0, stats.length)
-      case "entropy" => new EntropyCalculator(stats)
+      case "entropy" => new EntropyCalculator(stats, stats, 0, stats.length)
       case "variance" => new VarianceCalculator(stats, stats, 0, 3)
       case _ =>
         throw new IllegalArgumentException(

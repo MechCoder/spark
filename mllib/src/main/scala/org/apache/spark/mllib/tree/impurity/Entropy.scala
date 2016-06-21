@@ -56,6 +56,32 @@ object Entropy extends Impurity {
     impurity
   }
 
+  def calculate(allStats: Array[Double], offset: Int, statsSize: Int): Double = {
+    var index = offset
+    val endIndex = offset + statsSize
+    var totalCount = 0.0
+    while (index < endIndex) {
+      totalCount += allStats(index)
+      index += 1
+    }
+
+    if (totalCount == 0) {
+      return 0
+    }
+
+    var impurity = 0.0
+    index = offset
+    while (index < endIndex) {
+      val classCount = allStats(index)
+      if (classCount != 0) {
+        val freq = classCount / totalCount
+        impurity -= freq * log2(freq)
+      }
+      index += 1
+    }
+    impurity
+  }
+
   /**
    * :: DeveloperApi ::
    * variance calculation
@@ -110,7 +136,8 @@ private[spark] class EntropyAggregator(numClasses: Int)
    * @param offset    Start index of stats for this (node, feature, bin).
    */
   def getCalculator(allStats: Array[Double], offset: Int): EntropyCalculator = {
-    new EntropyCalculator(allStats.view(offset, offset + statsSize).toArray)
+    new EntropyCalculator(
+      allStats.view(offset, offset + statsSize).toArray, allStats, offset, statsSize)
   }
 }
 
@@ -120,22 +147,35 @@ private[spark] class EntropyAggregator(numClasses: Int)
  * (node, feature, bin).
  * @param stats  Array of sufficient statistics for a (node, feature, bin).
  */
-private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCalculator(stats) {
+private[spark] class EntropyCalculator(
+    stats: Array[Double],
+    var allStats: Array[Double],
+    offset: Int, statsSize: Int) extends ImpurityCalculator(stats) {
 
   /**
    * Make a deep copy of this [[ImpurityCalculator]].
    */
-  def copy: EntropyCalculator = new EntropyCalculator(stats.clone())
+  def copy: EntropyCalculator = new EntropyCalculator(
+    stats.clone(), allStats.clone(), offset, statsSize)
 
   /**
    * Calculate the impurity from the stored sufficient statistics.
    */
-  def calculate(): Double = Entropy.calculate(stats, stats.sum)
+  def calculate(): Double = Entropy.calculate(allStats, offset, statsSize)
 
   /**
    * Number of data points accounted for in the sufficient statistics.
    */
-  def count: Long = stats.sum.toLong
+  def count: Long = {
+    var index = offset
+    val endIndex = offset + statsSize
+    var totalCount = 0.0
+    while (index < endIndex) {
+      totalCount += allStats(index)
+      index += 1
+    }
+    totalCount.toLong
+  }
 
   /**
    * Prediction which should be made based on the sufficient statistics.
@@ -143,7 +183,21 @@ private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCal
   def predict: Double = if (count == 0) {
     0
   } else {
-    indexOfLargestArrayElement(stats)
+    indexOfLargestArrayElement(allStats)
+  }
+
+  override def indexOfLargestArrayElement(stats: Array[Double]): Int = {
+    var largest = -1
+    var largestValue = Double.MinValue
+    var index = 0
+    while (index < statsSize) {
+      if (stats(index + offset) > largestValue) {
+        largest = index
+        largestValue = stats(index + offset)
+      }
+      index += 1
+    }
+    largest
   }
 
   /**
@@ -151,15 +205,51 @@ private[spark] class EntropyCalculator(stats: Array[Double]) extends ImpurityCal
    */
   override def prob(label: Double): Double = {
     val lbl = label.toInt
-    require(lbl < stats.length,
-      s"EntropyCalculator.prob given invalid label: $lbl (should be < ${stats.length}")
-    require(lbl >= 0, "Entropy does not support negative labels")
+    require(lbl < statsSize,
+      s"GiniCalculator.prob given invalid label: $lbl (should be < ${statsSize}")
+    require(lbl >= 0, "GiniImpurity does not support negative labels")
     val cnt = count
     if (cnt == 0) {
       0
     } else {
-      stats(lbl) / cnt
+      allStats(lbl + offset) / cnt
     }
+  }
+
+  override def add(other: ImpurityCalculator): ImpurityCalculator = {
+    require(stats.length == other.stats.length,
+      s"Two ImpurityCalculator instances cannot be added with different counts sizes." +
+        s"  Sizes are ${stats.length} and ${other.stats.length}.")
+    var i = 0
+    val len = other.stats.length
+    val newAllStats = allStats.clone()
+    while (i < len) {
+      stats(i) += other.stats(i)
+      newAllStats(i + offset) += other.stats(i)
+      i += 1
+    }
+    this.allStats = newAllStats
+    this
+  }
+
+  /**
+   * Subtract the stats from another calculator from this one, modifying and returning this
+   * calculator.
+   */
+  override def subtract(other: ImpurityCalculator): ImpurityCalculator = {
+    require(stats.length == other.stats.length,
+      s"Two ImpurityCalculator instances cannot be subtracted with different counts sizes." +
+      s"  Sizes are ${stats.length} and ${other.stats.length}.")
+    var i = 0
+    val len = other.stats.length
+    val newAllStats = allStats.clone()
+    while (i < len) {
+      stats(i) -= other.stats(i)
+      newAllStats(i + offset) -= other.stats(i)
+      i += 1
+    }
+    this.allStats = newAllStats
+    this
   }
 
   override def toString: String = s"EntropyCalculator(stats = [${stats.mkString(", ")}])"
