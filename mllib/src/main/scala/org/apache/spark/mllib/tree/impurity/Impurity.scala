@@ -189,7 +189,7 @@ private[spark] object ImpurityCalculator {
     impurity match {
       case "gini" => new GiniCalculator(stats, stats, 0, stats.length)
       case "entropy" => new EntropyCalculator(stats)
-      case "variance" => new VarianceCalculator(stats)
+      case "variance" => new VarianceCalculator(stats, stats, 0, 3)
       case _ =>
         throw new IllegalArgumentException(
           s"ImpurityCalculator builder did not recognize impurity type: $impurity")

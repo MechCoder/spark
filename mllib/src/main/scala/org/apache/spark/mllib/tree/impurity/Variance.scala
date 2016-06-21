@@ -91,7 +91,8 @@ private[spark] class VarianceAggregator()
    * @param offset    Start index of stats for this (node, feature, bin).
    */
   def getCalculator(allStats: Array[Double], offset: Int): VarianceCalculator = {
-    new VarianceCalculator(allStats.view(offset, offset + statsSize).toArray)
+    new VarianceCalculator(
+      allStats.view(offset, offset + statsSize).toArray, allStats, offset, statsSize)
   }
 }
 
@@ -101,26 +102,31 @@ private[spark] class VarianceAggregator()
  * (node, feature, bin).
  * @param stats  Array of sufficient statistics for a (node, feature, bin).
  */
-private[spark] class VarianceCalculator(stats: Array[Double]) extends ImpurityCalculator(stats) {
+private[spark] class VarianceCalculator(
+    stats: Array[Double],
+    var allStats: Array[Double],
+    offset: Int, statsSize: Int) extends ImpurityCalculator(stats) {
 
-  require(stats.length == 3,
+  require(statsSize == 3,
     s"VarianceCalculator requires sufficient statistics array stats to be of length 3," +
-    s" but was given array of length ${stats.length}.")
+    s" but was given array of length ${statsSize}.")
 
   /**
    * Make a deep copy of this [[ImpurityCalculator]].
    */
-  def copy: VarianceCalculator = new VarianceCalculator(stats.clone())
+  def copy: VarianceCalculator = new VarianceCalculator(
+    stats.clone(), allStats.clone(), offset, statsSize)
 
   /**
    * Calculate the impurity from the stored sufficient statistics.
    */
-  def calculate(): Double = Variance.calculate(stats(0), stats(1), stats(2))
+  def calculate(): Double = Variance.calculate(
+    allStats(offset), allStats(offset + 1), allStats(offset + 2))
 
   /**
    * Number of data points accounted for in the sufficient statistics.
    */
-  def count: Long = stats(0).toLong
+  def count: Long = allStats(offset).toLong
 
   /**
    * Prediction which should be made based on the sufficient statistics.
@@ -128,11 +134,47 @@ private[spark] class VarianceCalculator(stats: Array[Double]) extends ImpurityCa
   def predict: Double = if (count == 0) {
     0
   } else {
-    stats(1) / count
+    allStats(offset + 1) / count
   }
 
   override def toString: String = {
-    s"VarianceAggregator(cnt = ${stats(0)}, sum = ${stats(1)}, sum2 = ${stats(2)})"
+    s"VarianceAggregator(cnt = ${allStats(0)}, sum = ${allStats(1)}, sum2 = ${allStats(2)})"
+  }
+
+  override def add(other: ImpurityCalculator): ImpurityCalculator = {
+    require(stats.length == other.stats.length,
+      s"Two ImpurityCalculator instances cannot be added with different counts sizes." +
+        s"  Sizes are ${stats.length} and ${other.stats.length}.")
+    var i = 0
+    val len = other.stats.length
+    val newAllStats = allStats.clone()
+    while (i < len) {
+      stats(i) += other.stats(i)
+      newAllStats(i + offset) += other.stats(i)
+      i += 1
+    }
+    this.allStats = newAllStats
+    this
+  }
+
+  /**
+   * Subtract the stats from another calculator from this one, modifying and returning this
+   * calculator.
+   */
+  override def subtract(other: ImpurityCalculator): ImpurityCalculator = {
+    require(stats.length == other.stats.length,
+      s"Two ImpurityCalculator instances cannot be subtracted with different counts sizes." +
+      s"  Sizes are ${stats.length} and ${other.stats.length}.")
+    var i = 0
+    val len = other.stats.length
+    val newAllStats = allStats.clone()
+    while (i < len) {
+      stats(i) -= other.stats(i)
+      newAllStats(i + offset) -= other.stats(i)
+      i += 1
+    }
+    this.allStats = newAllStats
+    this
   }
 
 }
