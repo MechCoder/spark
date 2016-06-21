@@ -110,39 +110,6 @@ private[spark] abstract class ImpurityCalculator(val stats: Array[Double]) exten
   def calculate(): Double
 
   /**
-   * Add the stats from another calculator into this one, modifying and returning this calculator.
-   */
-  def add(other: ImpurityCalculator): ImpurityCalculator = {
-    require(stats.length == other.stats.length,
-      s"Two ImpurityCalculator instances cannot be added with different counts sizes." +
-        s"  Sizes are ${stats.length} and ${other.stats.length}.")
-    var i = 0
-    val len = other.stats.length
-    while (i < len) {
-      stats(i) += other.stats(i)
-      i += 1
-    }
-    this
-  }
-
-  /**
-   * Subtract the stats from another calculator from this one, modifying and returning this
-   * calculator.
-   */
-  def subtract(other: ImpurityCalculator): ImpurityCalculator = {
-    require(stats.length == other.stats.length,
-      s"Two ImpurityCalculator instances cannot be subtracted with different counts sizes." +
-      s"  Sizes are ${stats.length} and ${other.stats.length}.")
-    var i = 0
-    val len = other.stats.length
-    while (i < len) {
-      stats(i) -= other.stats(i)
-      i += 1
-    }
-    this
-  }
-
-  /**
    * Number of data points accounted for in the sufficient statistics.
    */
   def count: Long
@@ -156,6 +123,10 @@ private[spark] abstract class ImpurityCalculator(val stats: Array[Double]) exten
    * Probability of the label given by [[predict]], or -1 if no probability is available.
    */
   def prob(label: Double): Double = -1
+
+  def add(other: ImpurityCalculator): ImpurityCalculator
+
+  def subtract(other: ImpurityCalculator): ImpurityCalculator
 
   /**
    * Return the index of the largest array element.
