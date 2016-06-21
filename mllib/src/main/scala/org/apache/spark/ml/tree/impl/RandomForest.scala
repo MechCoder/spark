@@ -537,15 +537,8 @@ private[spark] object RandomForest extends Logging {
       }
     }
 
-    timer.start("binsToBestSplitMaster")
-    timer.start("reduceByKey")
-    val nodeToBestSplitsR = partitionAggregates.reduceByKey((a, b) => a.merge(b))
-    nodeToBestSplitsR.collect()
-    timer.stop("reduceByKey")
-
-    val nodeToBestSplits1 = nodeToBestSplitsR.map {
+    val nodeToBestSplitsR = partitionAggregates.reduceByKey((a, b) => a.merge(b)).map {
       case (nodeIndex, aggStats) =>
-        val curr_time = System.nanoTime()
         val featuresForNode = nodeToFeaturesBc.value.flatMap { nodeToFeatures =>
           Some(nodeToFeatures(nodeIndex))
         }
@@ -553,14 +546,8 @@ private[spark] object RandomForest extends Logging {
         // find best split for each node
         val (split: Split, stats: ImpurityStats) =
           binsToBestSplit(aggStats, splits, featuresForNode, nodes(nodeIndex), timer)
-        val finishedTime = System.nanoTime() - curr_time
-        (nodeIndex, (split, stats, finishedTime))
+        (nodeIndex, (split, stats))
     }.collectAsMap()
-    timer.stop("binsToBestSplitMaster")
-
-    val nodeToBestSplits = nodeToBestSplits1.map { case(k, v) => (k, (v._1, v._2)) }
-    val binsToBestSplitTime = nodeToBestSplits1.map { case(k, v) => v._3 }.reduce(_ + _)
-    timer.updateTime("binsToBestSplit", binsToBestSplitTime.toLong)
 
     timer.stop("chooseSplits")
 
@@ -695,7 +682,7 @@ private[spark] object RandomForest extends Logging {
       binAggregates: DTStatsAggregator,
       splits: Array[Array[Split]],
       featuresForNode: Option[Array[Int]],
-      node: LearningNode, timer: TimeTracker): (Split, ImpurityStats) = {
+      node: LearningNode): (Split, ImpurityStats) = {
 
     // Calculate InformationGain and ImpurityStats if current node is top node
     val level = LearningNode.indexToLevel(node.id)

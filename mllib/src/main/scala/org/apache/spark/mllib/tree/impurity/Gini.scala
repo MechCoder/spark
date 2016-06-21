@@ -130,7 +130,7 @@ private[spark] class GiniAggregator(numClasses: Int)
    * @param offset    Start index of stats for this (node, feature, bin).
    */
   def getCalculator(allStats: Array[Double], offset: Int): GiniCalculator = {
-    new GiniCalculator(allStats, offset, numClasses)
+    new GiniCalculator(allStats, offset, statsSize)
   }
 }
 
