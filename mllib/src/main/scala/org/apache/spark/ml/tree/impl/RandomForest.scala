@@ -552,6 +552,7 @@ private[spark] object RandomForest extends Logging {
     val nodeToBestSplits = nodeToBestSplitsR.map(x => (x._1, (x._2._1, x._2._2)))
     val totalTime = nodeToBestSplitsR.map(x => x._2._3).reduce(_ + _)
     timer.stop("chooseSplits")
+    timer.updateTime("impurityCalculator", totalTime.toLong)
 
     val nodeIdUpdaters = if (nodeIdCache.nonEmpty) {
       Array.fill[mutable.Map[Int, NodeIndexUpdater]](

@@ -59,6 +59,12 @@ private[spark] class TimeTracker extends Serializable {
     elapsed / 1e9
   }
 
+
+  def updateTime(timerLabel: String, value: Long): Unit = {
+    val currTime = totals.getOrElse(timerLabel, 0L)
+    totals(timerLabel) = currTime + value
+  }
+
   /**
    * Print all timing results in seconds.
    */
