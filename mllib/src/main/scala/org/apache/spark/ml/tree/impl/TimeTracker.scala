@@ -26,7 +26,7 @@ private[spark] class TimeTracker extends Serializable {
 
   private val starts: MutableHashMap[String, Long] = new MutableHashMap[String, Long]()
 
-  private val totals: MutableHashMap[String, Long] = new MutableHashMap[String, Long]()
+  val totals: MutableHashMap[String, Long] = new MutableHashMap[String, Long]()
 
   /**
    * Starts a new timer, or re-starts a stopped timer.
